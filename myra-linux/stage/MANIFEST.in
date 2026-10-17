@@ -1,0 +1,5 @@
+include README.md
+include LICENSE*
+recursive-include aria_modules *.png *.jpg *.xml
+recursive-include assets *
+recursive-include fonts *

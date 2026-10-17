@@ -1,0 +1,43 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*service*account*.json
+firebase*.json
+
+# Claude Code local config
+.claude/
+
+# Build artifacts
+build/
+dist/
+dist_native/
+*.egg-info/
+__pycache__/
+*.py[cod]
+*.pyd
+*.obj
+*.exe
+*.msi
+*.apk
+*.zip
+
+# Node
+node_modules/
+
+# Personal / generated data
+**/aria_modules/TITAN_memory/
+**/Projects/
+**/.myra-site.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Runtime captures (webcam/screenshots/QR)
+**/TITAN_webcam/
+**/latest_qr.png
