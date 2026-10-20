@@ -11,7 +11,7 @@ v3.0 Changes:
   ✅ Live code output + todo panel fully functional
 """
 
-import os, json, time, tempfile, threading, subprocess
+import os, json, time, tempfile, threading, subprocess, shutil
 from pathlib import Path
 
 from PyQt5.QtWidgets import (
@@ -93,6 +93,26 @@ class MyraCoderEngine(QObject):
             if os.path.exists(p): return p
         return "node"
 
+    def _deps_ready(self):
+        return (self._coder_dir / "node_modules" / "chalk").exists()
+
+    def _install_deps(self):
+        # pip/EXE builds ship only the compiled dist/ — node_modules (chalk) nahi aata,
+        # warna Node "ERR_MODULE_NOT_FOUND" deta hai. Pehli run pe khud npm install karo.
+        npm = shutil.which("npm") or shutil.which("npm.cmd")
+        if not npm:
+            return False, "npm nahi mila — https://nodejs.org (Node 18+) install karo"
+        try:
+            r = subprocess.run([npm, "install", "--omit=dev", "--no-audit", "--no-fund"],
+                               cwd=str(self._coder_dir), capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=300,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except Exception as e:
+            return False, f"npm install fail: {e}"
+        if r.returncode != 0 or not self._deps_ready():
+            return False, "npm install fail: " + (r.stderr or r.stdout or "")[-300:]
+        return True, ""
+
     MAX_ATTEMPTS = 3   # Gemini kabhi beech mein fail / bina kaam kiye "done" bolta hai => retry
 
     def run(self, task, output_dir=None, provider="gemini", model=None, raw=False, expect_files=True):
@@ -122,7 +142,19 @@ class MyraCoderEngine(QObject):
         self._running   = True
         self._ctx       = {"task": full_task, "dir": output_dir, "provider": provider, "model": model, "attempt": 0,
                            "expect_files": expect_files}
-        self._launch()
+        if self._deps_ready():
+            self._launch()
+            return
+
+        self.sig_notice.emit("MYRA Coder ki dependencies install ho rahi hain (sirf pehli baar)...")
+        def _setup():
+            ok, err = self._install_deps()
+            if ok:
+                self._launch()
+            else:
+                self._running = False
+                self.sig_error.emit(err)
+        threading.Thread(target=_setup, daemon=True, name="MC-Setup").start()
 
     def _snapshot(self, d):
         out = {}
